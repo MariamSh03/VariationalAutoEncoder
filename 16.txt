@@ -1,0 +1,62 @@
+Epoch 1/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 22s 39ms/step - kl_loss: 8.3160 - recon_loss: 227.8628 - total_loss: 236.1788
+Epoch 2/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 18s 37ms/step - kl_loss: 19.9429 - recon_loss: 101.5856 - total_loss: 121.5285  
+Epoch 3/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 18s 38ms/step - kl_loss: 21.4050 - recon_loss: 89.1490 - total_loss: 110.5541 
+Epoch 4/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 18s 39ms/step - kl_loss: 21.6381 - recon_loss: 85.2249 - total_loss: 106.8630
+Epoch 5/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 18s 38ms/step - kl_loss: 21.7198 - recon_loss: 83.0999 - total_loss: 104.8197 
+Epoch 6/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 18s 38ms/step - kl_loss: 21.8503 - recon_loss: 81.8102 - total_loss: 103.6605 
+Epoch 7/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 17s 37ms/step - kl_loss: 22.0725 - recon_loss: 80.4283 - total_loss: 102.5008 
+Epoch 8/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 17s 37ms/step - kl_loss: 22.3475 - recon_loss: 79.2167 - total_loss: 101.5642
+Epoch 9/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 18s 37ms/step - kl_loss: 22.4576 - recon_loss: 78.5200 - total_loss: 100.9776
+Epoch 10/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 18s 38ms/step - kl_loss: 22.5265 - recon_loss: 77.9040 - total_loss: 100.4305
+Epoch 11/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 19s 40ms/step - kl_loss: 22.5972 - recon_loss: 77.4087 - total_loss: 100.0058 
+Epoch 12/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 17s 37ms/step - kl_loss: 22.6020 - recon_loss: 76.8474 - total_loss: 99.4494 
+Epoch 13/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 17s 37ms/step - kl_loss: 22.6381 - recon_loss: 76.7323 - total_loss: 99.3704  
+Epoch 14/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 17s 37ms/step - kl_loss: 22.6819 - recon_loss: 76.4128 - total_loss: 99.0947 
+Epoch 15/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 17s 37ms/step - kl_loss: 22.7516 - recon_loss: 76.1974 - total_loss: 98.9490  
+Epoch 16/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 17s 37ms/step - kl_loss: 22.7231 - recon_loss: 75.7817 - total_loss: 98.5049 
+Epoch 17/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 17s 37ms/step - kl_loss: 22.7452 - recon_loss: 75.7962 - total_loss: 98.5413  
+Epoch 18/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 17s 37ms/step - kl_loss: 22.7518 - recon_loss: 75.5575 - total_loss: 98.3093 
+Epoch 19/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 17s 37ms/step - kl_loss: 22.7830 - recon_loss: 75.1360 - total_loss: 97.9190 
+Epoch 20/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 18s 37ms/step - kl_loss: 22.7617 - recon_loss: 75.2237 - total_loss: 97.9853 
+Epoch 21/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 17s 37ms/step - kl_loss: 22.7505 - recon_loss: 74.9834 - total_loss: 97.7339  
+Epoch 22/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 21s 44ms/step - kl_loss: 22.7188 - recon_loss: 74.8131 - total_loss: 97.5319 
+Epoch 23/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 19s 41ms/step - kl_loss: 22.7555 - recon_loss: 74.7982 - total_loss: 97.5537  
+Epoch 24/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 18s 39ms/step - kl_loss: 22.7308 - recon_loss: 74.6221 - total_loss: 97.3529  
+Epoch 25/25
+469/469 ━━━━━━━━━━━━━━━━━━━━ 18s 39ms/step - kl_loss: 22.7388 - recon_loss: 74.5720 - total_loss: 97.3108   
+
+============================================================
+VAE ABLATION RESULTS (TEST SET)
+Latent dim (d):       16
+Beta (β):             1.0
+Epochs:               25
+Learning rate:        0.001
+------------------------------------------------------------
+Test recon loss (BCE, sum over pixels): 74.9880
+Test KL divergence (per sample):        22.5244
+Test total loss (recon + β*KL):         97.5124
+============================================================

@@ -1,0 +1,241 @@
+import os
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+import matplotlib.pyplot as plt
+
+# ----------------------------
+# Reproducibility
+# ----------------------------
+SEED = 42
+np.random.seed(SEED)
+tf.random.set_seed(SEED)
+
+# ----------------------------
+# Data (MNIST via TensorFlow)
+# ----------------------------
+(x_train, _), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+
+x_train = x_train.astype("float32") / 255.0
+x_test = x_test.astype("float32") / 255.0
+x_train = x_train[..., None]  # (N,28,28,1)
+x_test = x_test[..., None]
+
+BATCH_SIZE = 128
+
+# VAE training dataset: only x is needed
+train_ds = tf.data.Dataset.from_tensor_slices(x_train).shuffle(60000, seed=SEED).batch(BATCH_SIZE)
+
+# Keep labels ONLY for plotting latent space; not used for training
+test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(BATCH_SIZE)
+
+# AE training dataset: MUST be (x, x)
+ae_train_ds = tf.data.Dataset.from_tensor_slices((x_train, x_train)) \
+    .shuffle(60000, seed=SEED) \
+    .batch(BATCH_SIZE)
+
+ae_test_ds = tf.data.Dataset.from_tensor_slices((x_test, x_test)).batch(BATCH_SIZE)
+
+# ----------------------------
+# Model builders
+# ----------------------------
+def build_encoder(latent_dim: int):
+    inp = keras.Input(shape=(28, 28, 1))
+    x = layers.Conv2D(32, 3, strides=2, padding="same", activation="relu")(inp)   # 14x14
+    x = layers.Conv2D(64, 3, strides=2, padding="same", activation="relu")(x)     # 7x7
+    x = layers.Flatten()(x)
+    x = layers.Dense(128, activation="relu")(x)
+    z_mean = layers.Dense(latent_dim, name="z_mean")(x)
+    z_logvar = layers.Dense(latent_dim, name="z_logvar")(x)
+    return keras.Model(inp, [z_mean, z_logvar], name="encoder")
+
+class Sampling(layers.Layer):
+    def call(self, inputs):
+        z_mean, z_logvar = inputs
+        eps = tf.random.normal(shape=tf.shape(z_mean))
+        return z_mean + tf.exp(0.5 * z_logvar) * eps
+
+def build_decoder(latent_dim: int):
+    inp = keras.Input(shape=(latent_dim,))
+    x = layers.Dense(7 * 7 * 64, activation="relu")(inp)
+    x = layers.Reshape((7, 7, 64))(x)
+    x = layers.Conv2DTranspose(64, 3, strides=2, padding="same", activation="relu")(x)  # 14x14
+    x = layers.Conv2DTranspose(32, 3, strides=2, padding="same", activation="relu")(x)  # 28x28
+    out = layers.Conv2DTranspose(1, 3, padding="same", activation="sigmoid")(x)
+    return keras.Model(inp, out, name="decoder")
+
+# ----------------------------
+# VAE Model (custom train_step)
+# ----------------------------
+class VAE(keras.Model):
+    def __init__(self, encoder, decoder, beta=1.0, **kwargs):
+        super().__init__(**kwargs)
+        self.encoder = encoder
+        self.decoder = decoder
+        self.beta = beta
+        self.sampling = Sampling()
+
+        self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
+        self.recon_loss_tracker = keras.metrics.Mean(name="recon_loss")
+        self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
+
+    @property
+    def metrics(self):
+        return [self.total_loss_tracker, self.recon_loss_tracker, self.kl_loss_tracker]
+
+    def train_step(self, data):
+        x = data
+        with tf.GradientTape() as tape:
+            z_mean, z_logvar = self.encoder(x, training=True)
+            z = self.sampling([z_mean, z_logvar])
+            x_hat = self.decoder(z, training=True)
+
+            # Reconstruction loss (BCE per-pixel)
+            bce = keras.losses.binary_crossentropy(x, x_hat)
+            recon_loss = tf.reduce_mean(tf.reduce_sum(bce, axis=(1, 2)))  # sum over H,W
+
+            # KL divergence to N(0,I)
+            kl = -0.5 * (1.0 + z_logvar - tf.square(z_mean) - tf.exp(z_logvar))
+            kl_loss = tf.reduce_mean(tf.reduce_sum(kl, axis=1))
+
+            total_loss = recon_loss + self.beta * kl_loss
+
+        grads = tape.gradient(total_loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+
+        self.total_loss_tracker.update_state(total_loss)
+        self.recon_loss_tracker.update_state(recon_loss)
+        self.kl_loss_tracker.update_state(kl_loss)
+        return {m.name: m.result() for m in self.metrics}
+
+    def call(self, x, training=False):
+        z_mean, z_logvar = self.encoder(x, training=training)
+        z = self.sampling([z_mean, z_logvar])
+        return self.decoder(z, training=training)
+
+# ----------------------------
+# Baseline Autoencoder (deterministic)
+# ----------------------------
+def build_autoencoder(latent_dim: int):
+    inp = keras.Input(shape=(28, 28, 1))
+    x = layers.Conv2D(32, 3, strides=2, padding="same", activation="relu")(inp)
+    x = layers.Conv2D(64, 3, strides=2, padding="same", activation="relu")(x)
+    x = layers.Flatten()(x)
+    z = layers.Dense(latent_dim, activation="linear", name="z")(x)
+
+    x = layers.Dense(7 * 7 * 64, activation="relu")(z)
+    x = layers.Reshape((7, 7, 64))(x)
+    x = layers.Conv2DTranspose(64, 3, strides=2, padding="same", activation="relu")(x)
+    x = layers.Conv2DTranspose(32, 3, strides=2, padding="same", activation="relu")(x)
+    out = layers.Conv2DTranspose(1, 3, padding="same", activation="sigmoid")(x)
+
+    return keras.Model(inp, out, name="autoencoder")
+
+# ----------------------------
+# Training helpers
+# ----------------------------
+def plot_history(history, title="Training Curves"):
+    plt.figure()
+    for k, v in history.history.items():
+        plt.plot(v, label=k)
+    plt.title(title)
+    plt.xlabel("Epoch")
+    plt.ylabel("Value")
+    plt.legend()
+    plt.show()
+
+def show_reconstructions(model, x, n=16, title="Original vs Reconstruction"):
+    x = x[:n]
+    x_hat = model.predict(x, verbose=0)
+    plt.figure(figsize=(8, 4))
+    for i in range(n):
+        plt.subplot(2, n, i + 1)
+        plt.imshow(x[i, :, :, 0], cmap="gray")
+        plt.axis("off")
+        plt.subplot(2, n, n + i + 1)
+        plt.imshow(x_hat[i, :, :, 0], cmap="gray")
+        plt.axis("off")
+    plt.suptitle(title)
+    plt.show()
+
+def show_samples(decoder, latent_dim, n=64, title="Samples from N(0,I)"):
+    z = tf.random.normal((n, latent_dim))
+    x_gen = decoder.predict(z, verbose=0)
+    side = int(np.sqrt(n))
+    plt.figure(figsize=(6, 6))
+    for i in range(n):
+        plt.subplot(side, side, i + 1)
+        plt.imshow(x_gen[i, :, :, 0], cmap="gray")
+        plt.axis("off")
+    plt.suptitle(title)
+    plt.show()
+
+def plot_latent_2d(encoder, x, y, max_points=5000, title="2D Latent Means (colored by label)"):
+    x = x[:max_points]
+    y = y[:max_points]
+    z_mean, _ = encoder.predict(x, verbose=0)
+    plt.figure()
+    plt.scatter(z_mean[:, 0], z_mean[:, 1], s=2, c=y)
+    plt.title(title)
+    plt.xlabel("z1")
+    plt.ylabel("z2")
+    plt.show()
+
+def latent_interpolation(encoder, decoder, x_a, x_b, steps=10, title="Latent interpolation"):
+    z_a, _ = encoder.predict(x_a[None, ...], verbose=0)
+    z_b, _ = encoder.predict(x_b[None, ...], verbose=0)
+    z_a = z_a[0]
+    z_b = z_b[0]
+    alphas = np.linspace(0.0, 1.0, steps)
+    zs = np.stack([(1 - a) * z_a + a * z_b for a in alphas], axis=0)
+    imgs = decoder.predict(zs, verbose=0)
+
+    plt.figure(figsize=(steps, 2))
+    for i in range(steps):
+        plt.subplot(1, steps, i + 1)
+        plt.imshow(imgs[i, :, :, 0], cmap="gray")
+        plt.axis("off")
+    plt.suptitle(title)
+    plt.show()
+
+# ----------------------------
+# Run Step 5 experiments
+# ----------------------------
+LATENT_DIM = 2
+BETA = 1.0
+EPOCHS = 25
+LR = 1e-3
+
+# --- Train VAE ---
+encoder = build_encoder(LATENT_DIM)
+decoder = build_decoder(LATENT_DIM)
+vae = VAE(encoder, decoder, beta=BETA)
+vae.compile(optimizer=keras.optimizers.Adam(learning_rate=LR))
+
+hist_vae = vae.fit(train_ds, epochs=EPOCHS, verbose=1)
+plot_history(hist_vae, title=f"VAE Training Curves (d={LATENT_DIM}, beta={BETA})")
+
+show_reconstructions(vae, x_test, n=16, title="VAE: Original (top) vs Reconstruction (bottom)")
+show_samples(decoder, LATENT_DIM, n=64, title="VAE: Samples from N(0, I)")
+
+if LATENT_DIM == 2:
+    plot_latent_2d(encoder, x_test, y_test, title="VAE: 2D Latent Means (colored by digit label)")
+
+latent_interpolation(encoder, decoder, x_test[0], x_test[1], steps=12, title="VAE: Latent Interpolation")
+
+# --- Train Baseline AE (FIXED) ---
+ae = build_autoencoder(LATENT_DIM)
+ae.compile(
+    optimizer=keras.optimizers.Adam(learning_rate=LR),
+    loss=keras.losses.BinaryCrossentropy(reduction="sum_over_batch_size")
+)
+
+hist_ae = ae.fit(ae_train_ds, epochs=EPOCHS, verbose=1)
+plot_history(hist_ae, title=f"AE Training Curve (d={LATENT_DIM})")
+show_reconstructions(ae, x_test, n=16, title="AE: Original (top) vs Reconstruction (bottom)")
+
+ae_test_loss = ae.evaluate(ae_test_ds, verbose=0)
+print(f"AE test reconstruction loss (BCE): {ae_test_loss:.4f}")
+
+print("Done. For ablations: change LATENT_DIM and BETA, re-run training, and record recon loss + KL + sample quality.")
